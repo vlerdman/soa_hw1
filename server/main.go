@@ -5,7 +5,8 @@ import (
 	"encoding/xml"
 	"fmt"
 	"log"
-	"net/http"
+	"net"
+	"strconv"
 	"os"
 	"time"
 	"io"
@@ -52,7 +53,7 @@ type Responce struct {
 	Result string `json:"result"`
 }
 
-func GetResult(w http.ResponseWriter, r *http.Request) {
+func GetResult() string {
 	obj := GetDefaultObject()
 	bytes := SerializeFunc(obj)
 
@@ -68,14 +69,10 @@ func GetResult(w http.ResponseWriter, r *http.Request) {
 	}
 	elapsedDeserialization := time.Since(startDeserialization) / Times
 
-	resp := Responce{
-		Result: fmt.Sprintf("%s - %d - %s - %s", SelectedFormat, len(bytes), elapsedSerialization, elapsedDeserialization),
-	}
+	result := fmt.Sprintf("%s - %d - %s - %s", SelectedFormat, len(bytes), elapsedSerialization, elapsedDeserialization)
+	log.Printf("result: %s", result)
 
-	log.Printf("request result: %s", resp.Result)
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	return result
 }
 
 func SerializeJson(obj Object) []byte {
@@ -147,7 +144,10 @@ func main() {
 	if len(args) != 3 {
 		log.Fatalf("incorrect num of args provided: 3 is required")
 	}
-	port := args[1]
+	port, err := strconv.Atoi(args[1])
+	if err != nil {
+		log.Fatalf("incorrect port is provided")
+	}
 	SelectedFormat = args[2]
 
 	switch SelectedFormat {
@@ -164,9 +164,16 @@ func main() {
 	default:
 		log.Fatalf("format %s is not supported", SelectedFormat)
 	}
-	http.HandleFunc("/get_result", GetResult)
-	err := http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
-	if err != nil {
-		log.Fatalf("server stopped with error: %s", err)
+	
+	ServerConn, _ := net.ListenUDP("udp", &net.UDPAddr{IP:[]byte{0,0,0,0},Port:port,Zone:""})
+	defer ServerConn.Close()
+	buf := make([]byte, 1024)
+	for {
+		n, addr, _ := ServerConn.ReadFromUDP(buf)
+		log.Printf("receive bytes: %s", string(buf[0:n]))
+		if string(buf[0:n]) == "get_result" {
+            result := GetResult()
+			ServerConn.WriteTo([]byte(result), addr)
+		}
 	}
 }

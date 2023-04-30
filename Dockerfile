@@ -3,4 +3,4 @@ WORKDIR /app
 COPY . .
 RUN go mod tidy
 RUN go mod download
-CMD ["go", "run", "proxy/main.go", "2000"]
+

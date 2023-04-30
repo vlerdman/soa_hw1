@@ -1,49 +1,18 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
 	"log"
-	"net/http"
+	"net"
 	"os"
-	"io/ioutil"
+	"strconv"
 )
 
 var FormatToHost map[string]string
 
+var GetResultPath = "get_result"
 
 type Responce struct {
 	Result string `json:"result"`
-}
-
-func GetResult(w http.ResponseWriter, r *http.Request) {
-	format := r.URL.Query().Get("format")
-    host, ok := FormatToHost[format]
-
-	if !ok {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-    
-
-	res, err := http.Get(host + "/get_result")
-    if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	body, err := ioutil.ReadAll(res.Body)
-
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-    resp := Responce{}
-	json.Unmarshal(body, &resp)
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
 }
 
 func main() {
@@ -51,16 +20,58 @@ func main() {
 	if len(args) != 2 {
 		log.Fatalf("incorrect num of args provided: 2 is required")
 	}
-	port := args[1]
+	port, err := strconv.Atoi(args[1])
+	if err != nil {
+		log.Fatalf("incorrect port is provided")
+	}
 	
 	FormatToHost = make(map[string]string)
-    FormatToHost["json"] = "http://0.0.0.0:2001"
-	FormatToHost["xml"] = "http://0.0.0.0:2002"
-	FormatToHost["yaml"] = "http://0.0.0.0:2003"
+    FormatToHost["json"] = ":2001"
+	FormatToHost["xml"] = ":2002"
+	FormatToHost["yaml"] = ":2003"
 	
-	http.HandleFunc("/get_result", GetResult)
-	err := http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
-	if err != nil {
-		log.Fatalf("server stopped with error: %s", err)
+	ServerConn, _ := net.ListenUDP("udp", &net.UDPAddr{IP:[]byte{0,0,0,0},Port:port,Zone:""})
+	defer ServerConn.Close()
+	buf := make([]byte, 1024)
+
+
+
+	for {
+		n, addr, _ := ServerConn.ReadFromUDP(buf)
+
+		log.Printf("receive bytes: %s", string(buf[0:n]))
+		
+		if n <= len(GetResultPath) || string(buf[0:len(GetResultPath)]) != GetResultPath {
+			continue
+		}
+		format := string(buf[len(GetResultPath) + 1:n])
+		host, ok := FormatToHost[format]
+		if !ok {
+			log.Printf("invalid format %s is provided", format)
+			continue
+		}
+
+		udpServer, err := net.ResolveUDPAddr("udp", host)
+        if err != nil {
+			log.Printf("can't resolve udp server: %s", err)
+			continue
+		}
+
+
+		conn, err := net.DialUDP("udp", nil, udpServer)
+		if err != nil {
+			log.Printf("can't connect to udp server: %s", err)
+			continue
+		}
+
+		conn.Write([]byte("get_result"))
+
+		received := make([]byte, 1024)
+		conn.Read(received)
+
+		ServerConn.WriteTo(received, addr)
+
+
+		conn.Close()
 	}
 }
