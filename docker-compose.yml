@@ -7,14 +7,14 @@ services:
       dockerfile: Dockerfile
     container_name: proxy_container
     ports:
-      - "2000:2000/udp"
+      - "2000:2000/tcp"
   json-server:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: json_server
     ports:
-      - "2001:2001/udp"
+      - "2001:2001/tcp"
     command: ["go", "run", "server/main.go", "2001", "json"]
   xml-server:
     build:
@@ -22,7 +22,7 @@ services:
       dockerfile: Dockerfile
     container_name: xml_server
     ports:
-      - "2002:2002/udp"
+      - "2002:2002/tcp"
     command: ["go", "run", "server/main.go", "2002", "xml"]
   yaml-server:
     build:
@@ -30,5 +30,5 @@ services:
       dockerfile: Dockerfile
     container_name: yaml_server
     ports:
-      - "2003:2003/udp"
+      - "2003:2003/tcp"
     command: ["go", "run", "server/main.go", "2003", "yaml"]
