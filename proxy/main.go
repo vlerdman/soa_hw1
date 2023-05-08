@@ -26,9 +26,9 @@ func main() {
 	}
 	
 	FormatToHost = make(map[string]string)
-    FormatToHost["json"] = ":2001"
-	FormatToHost["xml"] = ":2002"
-	FormatToHost["yaml"] = ":2003"
+    FormatToHost["json"] = "json_server:2001"
+	FormatToHost["xml"] = "xml_server:2002"
+	FormatToHost["yaml"] = "yaml_server:2003"
 	
 	ServerConn, _ := net.ListenUDP("udp", &net.UDPAddr{IP:[]byte{0,0,0,0},Port:port,Zone:""})
 	defer ServerConn.Close()
